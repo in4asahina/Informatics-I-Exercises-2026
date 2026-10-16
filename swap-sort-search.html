@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>【ポイント講義】交換・整列・探索</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&family=BIZ+UDPGothic:wght@400;700&family=BIZ+UDPMincho:wght@700&display=swap">
+<style>
+/* Layout: 上にタブ、左に「配列の舞台（アニメーション）」、右に「共通テスト表記のプログラム」。狭い画面では縦に積む */
+:root{
+  --bg:#edf0f4; --panel:#ffffff; --panel2:#f5f7fa; --ink:#1b2230; --muted:#596273; --line:#d2d8e1;
+  --accent:#2547a6; --accent-soft:#e1e7f8;
+  --cmp:#c96a00; --cmp-soft:#fde8c8;
+  --ok:#1d7f53; --ok-soft:#d6efe2;
+  --hold:#6d3fd0; --hold-soft:#ebe3fb;
+  --bad:#b8321f; --bad-soft:#f9e0db;
+  --cur:#fff3bf; --curline:#e3b52b;
+  --p-i:#2547a6; --p-j:#c96a00; --p-s:#b8321f; --p-c:#6d3fd0; --p-lo:#0e7c7b;
+  --shadow:0 1px 2px rgba(20,30,50,.06),0 4px 14px rgba(20,30,50,.06);
+  --f-ui:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --f-code:"BIZ UDGothic","Osaka-Mono","MS Gothic",ui-monospace,monospace;
+  --f-title:"BIZ UDPMincho","Hiragino Mincho ProN","Yu Mincho",serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10141b; --panel:#181e28; --panel2:#1e2531; --ink:#e5e9f0; --muted:#9aa3b3; --line:#2d3644;
+    --accent:#8ea7ff; --accent-soft:#232e4b; --cmp:#f3a43a; --cmp-soft:#3b2b12; --ok:#4cc38a; --ok-soft:#163427;
+    --hold:#b597ff; --hold-soft:#2a2242; --bad:#ff8a73; --bad-soft:#3d1f1a; --cur:#37311a; --curline:#d4a933;
+    --p-i:#8ea7ff; --p-j:#f3a43a; --p-s:#ff8a73; --p-c:#b597ff; --p-lo:#45c7c4;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10141b; --panel:#181e28; --panel2:#1e2531; --ink:#e5e9f0; --muted:#9aa3b3; --line:#2d3644;
+  --accent:#8ea7ff; --accent-soft:#232e4b; --cmp:#f3a43a; --cmp-soft:#3b2b12; --ok:#4cc38a; --ok-soft:#163427;
+  --hold:#b597ff; --hold-soft:#2a2242; --bad:#ff8a73; --bad-soft:#3d1f1a; --cur:#37311a; --curline:#d4a933;
+  --p-i:#8ea7ff; --p-j:#f3a43a; --p-s:#ff8a73; --p-c:#b597ff; --p-lo:#45c7c4;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.6;margin:0}
+.wrap{max-width:1320px;margin:0 auto;padding-inline:16px;padding-block:14px 40px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 20px;margin-bottom:12px}
+header.top h1{font-family:var(--f-title);font-weight:700;font-size:1.55rem;margin:0;letter-spacing:.02em;text-wrap:balance}
+header.top .sub{color:var(--muted);font-size:.86rem}
+nav.tabs{display:flex;flex-wrap:wrap;gap:10px 18px;margin-bottom:14px}
+.tgroup{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tgroup .gl{font-size:.75rem;color:var(--muted);letter-spacing:.08em;margin-right:2px}
+.tab{font:inherit;font-weight:700;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 14px;border-radius:999px;cursor:pointer}
+.tab:hover{border-color:var(--accent)}
+.tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.tab:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--curline);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:980px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);min-width:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line);font-weight:700;font-size:.9rem}
+.ph .tag{font-weight:400;color:var(--muted);font-size:.78rem}
+.pb{padding:12px 14px}
+/* ---- stage ---- */
+.stagebox{padding:6px 10px 4px;overflow:hidden}
+#stage{position:relative;width:100%;user-select:none}
+.card{position:absolute;border:2px solid var(--line);background:var(--panel);border-radius:9px;display:flex;align-items:center;justify-content:center;overflow:hidden;font-family:var(--f-code);font-weight:700;transition:border-color .2s,background-color .2s,opacity .25s,box-shadow .2s;font-variant-numeric:tabular-nums}
+.card .lvl{position:absolute;left:0;right:0;bottom:0;background:var(--accent-soft);transition:height .25s}
+.card .val{position:relative;z-index:1}
+.card.done{border-color:var(--ok)}
+.card.done .lvl{background:var(--ok-soft)}
+.card.dim{opacity:.28}
+.card.cmp{border-color:var(--cmp);box-shadow:0 0 0 4px var(--cmp-soft)}
+.card.stale .val{opacity:.3}
+.card.stale .lvl{opacity:.35}
+.card.stale{border-style:dashed}
+.card.found{border-color:var(--ok);box-shadow:0 0 0 5px var(--ok-soft);background:var(--ok-soft)}
+.card.src{border-style:dashed}
+.card.land{animation:land .55s ease-out}
+@keyframes land{0%{box-shadow:0 0 0 8px var(--curline)}100%{box-shadow:0 0 0 0 transparent}}
+.card.tmp{border-color:var(--hold);border-width:2.5px}
+.card.tmp .lvl{background:var(--hold-soft)}
+.card.tmp.empty .val{color:var(--muted);font-weight:400}
+.card.clickable{cursor:pointer}
+.card.clickable:hover{border-color:var(--accent)}
+.card.ghost{z-index:20;border-color:var(--curline);box-shadow:0 8px 20px rgba(0,0,0,.25);pointer-events:none;transition:none}
+.tmplabel{position:absolute;font-family:var(--f-code);font-weight:700;color:var(--hold);font-size:.85rem;text-align:center}
+.idx{position:absolute;text-align:center;font-family:var(--f-code);font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.idx.named{font-size:1rem;font-weight:700;color:var(--ink)}
+.br{position:absolute;height:18px;border:2px solid var(--muted);border-bottom:none;border-radius:6px 6px 0 0;transition:left .3s,width .3s,opacity .3s}
+.br span{position:absolute;left:50%;top:-11px;transform:translateX(-50%);background:var(--panel);padding:0 6px;font-size:.74rem;color:var(--muted);white-space:nowrap}
+.br.k-done{border-color:var(--ok)} .br.k-done span{color:var(--ok)}
+.ptr{position:absolute;height:24px;padding:0 7px;border-radius:6px;color:var(--panel);font-family:var(--f-code);font-weight:700;font-size:.8rem;line-height:24px;white-space:nowrap;transition:left .3s ease,opacity .25s;transform:translateX(-50%)}
+.ptr::before{content:"";position:absolute;left:50%;top:-6px;transform:translateX(-50%);border:6px solid transparent;border-top:none;border-bottom-color:inherit;border-bottom-width:6px}
+.ptr.off{opacity:0}
+.banner{margin:2px 10px 12px;padding:9px 12px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);font-size:.95rem;min-height:2.6em;overflow-wrap:anywhere;box-sizing:border-box}
+.banner b{color:var(--accent);margin-right:.4em;font-family:var(--f-code)}
+.res-t{color:var(--ok);font-weight:700} .res-f{color:var(--bad);font-weight:700}
+/* controls */
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
+.btn{font:inherit;font-weight:700;border:1.5px solid var(--line);background:var(--panel2);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.btn:disabled{opacity:.45;cursor:default}
+.speed{display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--muted)}
+.scrub{flex:1 1 180px;display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums;min-width:0}
+.scrub input{flex:1;min-width:80px}
+.counters{display:flex;flex-wrap:wrap;gap:8px;padding:0 12px 12px}
+.cnt{display:flex;align-items:baseline;gap:8px;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--panel2)}
+.cnt .k{font-size:.78rem;color:var(--muted)} .cnt .v{font-family:var(--f-code);font-weight:700;font-size:1.15rem;font-variant-numeric:tabular-nums}
+/* options */
+.opts{display:flex;flex-direction:column;gap:10px}
+.orow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.orow > label.l{font-size:.8rem;color:var(--muted);min-width:5.5em}
+.orow input[type=text],.orow input[type=number],.orow select{font:inherit;font-family:var(--f-code);padding:5px 8px;border:1.5px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);min-width:0}
+.orow input[type=text]{flex:1 1 200px}
+.orow input[type=number]{width:6em}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;border:none;background:var(--panel);color:var(--ink);padding:5px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:700}
+.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.err{color:var(--bad);font-size:.82rem;min-height:1.2em}
+.note{font-size:.8rem;color:var(--muted)}
+/* code */
+.code{font-family:var(--f-code);font-size:.93rem;line-height:1.75;padding:8px 0;overflow-x:auto}
+.ln{display:flex;align-items:stretch;padding-right:12px;position:relative;min-width:max-content}
+.ln .no{flex:0 0 2.6em;text-align:right;padding-right:.8em;color:var(--muted);font-size:.8rem;user-select:none;font-variant-numeric:tabular-nums;align-self:center}
+.ln .gs{display:flex;flex:0 0 auto}
+.g{width:1.5em;position:relative}
+.g::before{content:"";position:absolute;left:.35em;top:0;bottom:0;border-left:1.6px solid var(--muted)}
+.g.e::before{bottom:.28em}
+.g.e::after{content:"";position:absolute;left:.35em;bottom:.28em;width:.8em;border-top:1.6px solid var(--muted)}
+.ln .tx{white-space:pre;padding-left:.15em}
+.ln.cur{background:var(--cur)}
+.ln.cur::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--curline)}
+.ln.prev{background:linear-gradient(90deg,var(--panel2),transparent)}
+.kw{color:var(--accent);font-weight:700}
+.cm{color:var(--muted)}
+.blank{display:inline-block;min-width:2.2em;text-align:center;border:1.5px solid var(--ink);padding:0 .3em;line-height:1.35;margin:0 .1em;font-family:var(--f-ui);font-weight:700}
+.strike .tx{text-decoration:line-through;color:var(--bad)}
+.miss{font-family:var(--f-ui);font-size:.75rem;color:var(--bad);margin-left:.6em;text-decoration:none;display:inline-block}
+.badge{margin-left:10px;font-family:var(--f-ui);font-size:.78rem;font-weight:700;padding:0 8px;border-radius:999px;align-self:center;line-height:1.7;white-space:nowrap}
+.badge.t{background:var(--ok-soft);color:var(--ok)} .badge.f{background:var(--bad-soft);color:var(--bad)} .badge.n{background:var(--accent-soft);color:var(--accent)}
+/* vars */
+.vars{display:flex;flex-wrap:wrap;gap:8px}
+.var{display:flex;align-items:baseline;gap:8px;border:1.5px solid var(--line);border-radius:8px;padding:3px 10px;font-family:var(--f-code)}
+.var .k{color:var(--muted);font-size:.85rem}
+.var .v{font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums}
+.var.chg{animation:chg .8s ease-out}
+@keyframes chg{0%{background:var(--cur);border-color:var(--curline)}100%{background:transparent}}
+.out{font-family:var(--f-code);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-height:2.2em;white-space:pre-wrap;overflow-wrap:anywhere}
+.out .warn{color:var(--bad);font-family:var(--f-ui);font-weight:700}
+/* log */
+.log{max-height:240px;overflow:auto;margin:0;padding:6px 0;list-style:none;font-size:.86rem}
+.log li{display:flex;gap:10px;padding:2px 14px;overflow-wrap:anywhere}
+.log li .l{flex:0 0 3.2em;color:var(--muted);font-family:var(--f-code);font-size:.78rem;padding-top:.15em}
+.log li.now{background:var(--cur)}
+/* points */
+.points{margin:0;padding:0 14px 12px 14px;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:.9rem}
+.points li{padding-left:1.1em;text-indent:-1.1em}
+.points li::before{content:"・"}
+.points li.try::before{content:"？"; color:var(--accent);font-weight:700}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:.76rem;color:var(--muted);padding:0 12px 10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:14px;height:14px;border-radius:4px;border:2px solid var(--line);display:inline-block}
+@media (prefers-reduced-motion: reduce){ .card,.ptr,.br{transition:none} .card.land,.var.chg{animation:none} }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>【ポイント講義】交換・整列・探索</h1>
+      <div class="sub">情報Ⅰ演習｜共通テスト用プログラム表記と1行ずつ同期して動きます</div>
+    </div>
+    <div class="sub">→ キーで1行進む／← で戻る／Space で自動再生</div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="アルゴリズムの選択"></nav>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel">
+        <div class="ph"><span id="stageTitle">配列のようす</span><span class="tag" id="stageTag"></span></div>
+        <div class="stagebox"><div id="stage"></div></div>
+        <div class="legend" id="legend"></div>
+        <div class="banner" id="banner"></div>
+        <div class="counters" id="counters"></div>
+        <div class="controls">
+          <button class="btn" id="bReset" title="最初に戻る">⏮ 最初</button>
+          <button class="btn" id="bBack" title="1行戻る（←）">◀ 戻る</button>
+          <button class="btn primary" id="bStep" title="1行進む（→）">1行進む ▶</button>
+          <button class="btn" id="bPlay" title="自動再生（Space）">▶ 自動再生</button>
+          <button class="btn" id="bEnd" title="最後まで">⏭ 最後</button>
+          <label class="speed" for="speed">速さ <input type="range" id="speed" min="1" max="5" value="3"></label>
+          <div class="scrub"><input type="range" id="scrub" min="0" max="1" value="0" aria-label="ステップ位置"><span id="stepNo">0 / 0</span></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="ph"><span>データと設定</span><span class="tag">値を変えて試そう</span></div>
+        <div class="pb opts" id="opts"></div>
+      </section>
+
+    </div>
+
+    <div class="col">
+      <section class="panel">
+        <div class="ph"><span>プログラム</span><span class="tag">共通テスト用プログラム表記</span></div>
+        <div class="code" id="code"></div>
+      </section>
+      <section class="panel">
+        <div class="ph"><span>変数</span><span class="tag">黄色く光る＝今の行で値が変わった</span></div>
+        <div class="pb vars" id="vars"></div>
+      </section>
+      <section class="panel">
+        <div class="ph"><span>実行結果（表示する）</span></div>
+        <div class="pb"><div class="out" id="out"></div></div>
+      </section>
+      <section class="panel">
+        <div class="ph"><span>実行の記録（トレース）</span><span class="tag">何行目で何が起きたか</span></div>
+        <ol class="log" id="log"></ol>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const range=(a,b)=>{const r=[];for(let i=a;i<=b;i++)r.push(i);return r;};
+const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------------- テキスト整形 ---------------- */
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const KW=['ずつ増やしながら繰り返す:','ずつ減らしながら繰り返す:','の間繰り返す:','そうでなくもし','そうでなければ:','プログラムを終了する','反復を抜ける','ならば:','もし','表示する','要素数',' を ',' から ',' まで ',' and ',' or '];
+const KWRE=new RegExp(KW.map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'g');
+function tok(html,blank){
+  html=html.replace(/\{\?([^{}]*)\}/g,(m,a)=>blank?'':a);
+  html=html.replace(/\{([ア-ン]):([^{}]+)\}/g,(m,l,a)=>blank?`<span class="blank">${l}</span>`:a);
+  return html;
+}
+function fmtLog(s,blank){
+  let h=tok(esc(s),blank);
+  h=h.replace(/→　真/g,'→　<span class="res-t">真</span>').replace(/→　偽/g,'→　<span class="res-f">偽</span>');
+  return h;
+}
+function codeLine(raw,blank){
+  const m=raw.match(/^([│⎿]*)(.*)$/); const marks=[...m[1]]; let text=m[2]; let strike=false;
+  if(text.startsWith('~')){strike=true;text=text.slice(1);}
+  const ci=text.indexOf('#'); const code=ci>=0?text.slice(0,ci):text; const cm=ci>=0?text.slice(ci):'';
+  let h=tok(esc(code).replace(KWRE,'<span class="kw">$&</span>'),blank);
+  if(cm) h+=`<span class="cm">${esc(cm)}</span>`;
+  return {guides:marks.map(c=>`<span class="g${c==='⎿'?' e':''}"></span>`).join(''),html:h,strike};
+}
+
+/* ---------------- トレーサ（1行実行するごとに状態を記録） ---------------- */
+class Tracer{
+  constructor(arr,tmpName){this.a=arr.slice();this.t=null;this.tn=tmpName;this.v={};this.p={};this.reg={};this.cnt={cmp:0,a:0};this.out=[];this.steps=[];this.sync=null;}
+  s(line,log,x={}){
+    if(this.sync)this.sync();
+    this.steps.push({line,log,arr:this.a.slice(),t:this.t,v:{...this.v},p:{...this.p},reg:JSON.parse(JSON.stringify(this.reg)),cnt:{...this.cnt},out:this.out.slice(),act:x.act||null,badge:x.badge||null,end:!!x.end});
+  }
+  copy(line,from,to,log,x={}){
+    const val=from==='t'?this.t:this.a[from];
+    if(to==='t'){this.t=val;if(this.tn)this.v[this.tn]=val;}else this.a[to]=val;
+    this.s(line,log,{...x,act:{type:'copy',from,to}});
+  }
+}
+const TF=b=>b?'真':'偽';
+const isSorted=(a,asc)=>a.every((v,i)=>i===0||(asc?a[i-1]<=v:a[i-1]>=v));
+
+/* ---------------- アルゴリズム定義 ---------------- */
+const ALGOS=[
+{
+  id:'swap',group:'交換',tab:'交換',title:'値の交換',arrName:null,tmpName:'koukan',
+  slotLabels:['x','y'],maxSlot:170,maxCard:84,pads:[0,0],ptrs:[],
+  vars:['x','y','koukan'],counters:[],
+  input:'xy',defaults:{xy:[5,8],variant:'ok'},
+  variants:[{id:'ok',label:'koukan を使う（正しい交換）'},{id:'ng',label:'koukan を使わない（誤った交換）'}],
+  legend:[['tmp','退避用の変数 koukan']],
+  code(o){const[x,y]=o.xy;return o.variant==='ok'
+    ?[`x = ${x}`,`y = ${y}`,'koukan = x　# x の値を退避','x = y','y = koukan','表示する(x, y)']
+    :[`x = ${x}`,`y = ${y}`,'x = y','y = x','表示する(x, y)'];},
+  trace(o){
+    const[x,y]=o.xy;const T=new Tracer([null,null],o.variant==='ok'?'koukan':null);
+    T.sync=()=>{T.v.x=T.a[0]??undefined;T.v.y=T.a[1]??undefined;};
+    T.s(0,'');
+    T.a[0]=x;T.s(1,`x = ${x}`,{act:{type:'set',to:0}});
+    T.a[1]=y;T.s(2,`y = ${y}`,{act:{type:'set',to:1}});
+    if(o.variant==='ok'){
+      T.copy(3,0,'t',`koukan = x = ${x}　（x の値を koukan にコピーして退避）`);
+      T.copy(4,1,0,`x = y = ${y}　（x の元の値は上書きされるが、koukan に残っている）`);
+      T.copy(5,'t',1,`y = koukan = ${x}　（退避しておいた値を y へ）`);
+      T.out.push(`${T.a[0]} ${T.a[1]}`);T.s(6,`表示する(x, y)　→　${T.a[0]} ${T.a[1]}　（交換できた）`,{end:true});
+    }else{
+      T.copy(3,1,0,`x = y = ${y}　（x の元の値 ${x} は上書きされて消える）`);
+      T.copy(4,0,1,`y = x = ${T.a[0]}　（x はすでに ${y} になっている）`);
+      T.out.push(`${T.a[0]} ${T.a[1]}`);T.s(5,`表示する(x, y)　→　${T.a[0]} ${T.a[1]}　（交換できていない！）`,{end:true});
+    }
+    return T.steps;
+  },
+  points:[
+    '代入は「右辺の値をコピーして、左辺の箱の中身を上書きする」命令。x = y を実行すると x の元の値は消える。',
+    'だから先に koukan に退避してから入れ替える。前の行の右辺が次の行の左辺になり、「しりとり」のようにつながる。',
+    '共通テストでは koukan・tmp・temp などの名前で出る。整列アルゴリズムの中でもこの3行がそのまま使われる。',
+    {t:'「koukan を使わない」に切り替えて、どの行で値が消えるか確かめよう。',try:true},
+  ]
+},
+{
+  id:'selection',group:'整列',tab:'選択ソート',title:'選択ソート',arrName:'Hairetsu',tmpName:'koukan',
+  ptrs:[{n:'i',c:'--p-i',row:0},{n:'j',c:'--p-j',row:1},{n:'saisyou',c:'--p-s',row:2}],
+  vars:['n','i','j','saisyou','koukan'],
+  counters:[['cmp','比較回数（8行目）'],['a','処理A（10〜12行目）']],
+  input:'arr',order:true,blanks:true,defaults:{arr:[9,4,2,7],order:'asc'},
+  presets:[{label:'問題集【1】の例',arr:[9,4,2,7]}],
+  legend:[['done','整列済み（確定）'],['cmp','比較中'],['tmp','退避用 koukan']],
+  code(o){const op=o.order==='asc'?'<':'>';return[
+    '# 設定','Hairetsu = 【外部から配列を入力】','n = 要素数(Hairetsu)　# 配列Hairetsuの要素数を代入','# 処理',
+    'i を 0 から n - 2 まで 1 ずつ増やしながら繰り返す:',
+    '│saisyou = i',
+    '│j を i + 1 から n - 1 まで 1 ずつ増やしながら繰り返す:',
+    `││もし Hairetsu[{ア:j}] ${op} Hairetsu[{イ:saisyou}] ならば:`,
+    '│⎿⎿{ウ:saisyou} = {エ:j}',
+    '│koukan = Hairetsu[i]','│Hairetsu[i] = Hairetsu[saisyou]','⎿Hairetsu[saisyou] = koukan',
+    '# 結果表示','表示する(Hairetsu)'];},
+  trace(o){
+    const a=o.arr,n=a.length,asc=o.order==='asc',op=asc?'<':'>',word=asc?'最小':'最大';
+    const T=new Tracer(a,'koukan');T.s(0,'');
+    T.s(2,`Hairetsu = [${a.join(', ')}]`);
+    T.v.n=n;T.s(3,`n = 要素数(Hairetsu) = ${n}`);
+    for(let i=0;i<=n-2;i++){
+      T.v.i=i;T.p.i=i;delete T.p.j;delete T.p.saisyou;T.v.j=undefined;
+      T.reg={done:range(0,i-1),br:{lo:i,hi:n-1,label:'未整列部分'}};
+      T.s(5,`i = ${i}　（0 〜 n - 2 = ${n-2} の範囲なので繰り返す）`,{badge:`i = ${i}`});
+      let s=i;T.v.saisyou=s;T.p.saisyou=s;
+      T.s(6,`saisyou = i = ${i}　（ひとまず未整列部分の先頭を${word}とみなす）`);
+      for(let j=i+1;j<=n-1;j++){
+        T.v.j=j;T.p.j=j;T.s(7,`j = ${j}　（i + 1 = ${i+1} 〜 n - 1 = ${n-1}）`,{badge:`j = ${j}`});
+        const r=asc?T.a[j]<T.a[s]:T.a[j]>T.a[s];T.cnt.cmp++;
+        T.s(8,`Hairetsu[{ア:j}] ${op} Hairetsu[{イ:saisyou}]{?　→　Hairetsu[${j}] ${op} Hairetsu[${s}]}　→　${T.a[j]} ${op} ${T.a[s]}　→　${TF(r)}`,{act:{type:'cmp',idx:[j,s]},badge:TF(r)});
+        if(r){s=j;T.v.saisyou=s;T.p.saisyou=s;T.s(9,`{ウ:saisyou} = {エ:j}{?　→　saisyou = ${j}}　（${word}値の「位置」を更新）`);}
+      }
+      delete T.p.j;T.s(7,`j が n - 1 = ${n-1} を超えたので、j の繰り返しを終了`,{badge:'終了'});
+      T.cnt.a++;
+      T.copy(10,i,'t',`koukan = Hairetsu[${i}] = ${T.a[i]}　（処理A ${T.cnt.a}回目：先頭の値を退避）`);
+      T.copy(11,s,i,`Hairetsu[${i}] = Hairetsu[${s}] = ${T.a[s]}${s===i?'　（自分自身との交換）':''}`);
+      T.reg.done=range(0,i);
+      T.copy(12,'t',s,`Hairetsu[${s}] = koukan = ${T.t}　→　添字 ${i} の値が確定`);
+    }
+    T.p={};T.reg={done:range(0,n-1)};
+    T.s(5,`i が n - 2 = ${n-2} を超えたので、繰り返しを終了`,{badge:'終了'});
+    T.out.push(`[${T.a.join(', ')}]`);T.s(14,`表示する(Hairetsu)　→　[${T.a.join(', ')}]`,{end:true});
+    return T.steps;
+  },
+  points:[
+    '未整列部分から最小（降順なら最大）の値を「選んで」、未整列部分の先頭と交換する。1周ごとに左端から1つずつ確定する。',
+    'saisyou には最小値そのものではなく、最小値がある「添字（位置）」を入れる。だから8行目は Hairetsu[saisyou] と比べる。',
+    '10〜12行目は「交換」の3行そのもの。koukan に退避 → 上書き → 戻す。',
+    {t:'最小値が最初から未整列部分の先頭にあるとき、10〜12行目は実行される？ カウンタで確かめよう。',try:true},
+    {t:'「整列済み」「逆順」を試して、比較回数が変わるかどうか確かめよう。',try:true},
+  ]
+},
+{
+  id:'insertion',group:'整列',tab:'挿入ソート',title:'挿入ソート',arrName:'Hairetsu',tmpName:'hozon',pads:[1,0],
+  ptrs:[{n:'i',c:'--p-i',row:0},{n:'j',c:'--p-j',row:1}],
+  vars:['n','i','hozon','j'],
+  counters:[['cmp','比較回数（8行目の値の比較）'],['a','処理A（9・10行目）']],
+  input:'arr',order:true,blanks:true,defaults:{arr:[3,8,1,4],order:'desc'},
+  presets:[{label:'問題集【2】の例',arr:[3,8,1,4]}],
+  legend:[['done','整列済み部分'],['cmp','比較中'],['tmp','取り出した値 hozon']],
+  code(o){const op=o.order==='desc'?'<':'>';return[
+    '# 設定','Hairetsu = 【外部から配列を入力】','n = 要素数(Hairetsu)　# 配列Hairetsuの要素数を代入','# 処理',
+    'i を 1 から {ア:n - 1} まで 1 ずつ増やしながら繰り返す:',
+    '│hozon = Hairetsu[i]',
+    '│j = {イ:i - 1}',
+    `│j >= 0 and Hairetsu[{ウ:j}] ${op} hozon の間繰り返す:`,
+    '││Hairetsu[{エ:j + 1}] = Hairetsu[{オ:j}]',
+    '│⎿j = j - 1',
+    '⎿Hairetsu[{カ:j + 1}] = hozon',
+    '# 結果表示','表示する(Hairetsu)'];},
+  trace(o){
+    const a=o.arr,n=a.length,desc=o.order==='desc',op=desc?'<':'>';
+    const T=new Tracer(a,'hozon');T.s(0,'');
+    T.s(2,`Hairetsu = [${a.join(', ')}]`);
+    T.v.n=n;T.s(3,`n = 要素数(Hairetsu) = ${n}`);
+    for(let i=1;i<=n-1;i++){
+      T.v.i=i;T.p.i=i;delete T.p.j;T.v.j=undefined;
+      T.reg={done:range(0,i-1),br:{lo:0,hi:i-1,label:'整列済み部分',k:'done'}};
+      T.s(5,`i = ${i}　（1 〜 {ア:n - 1}{? = ${n-1}} の範囲なので繰り返す）`,{badge:`i = ${i}`});
+      T.reg.stale=i;T.copy(6,i,'t',`hozon = Hairetsu[${i}] = ${T.a[i]}　（未整列部分の先頭を取り出して退避）`);
+      let j=i-1;T.v.j=j;T.p.j=j;T.s(7,`j = {イ:i - 1}{? = ${j}}　（整列済み部分の末尾から比べ始める）`);
+      while(true){
+        if(j<0){T.s(8,`j >= 0　→　${j} >= 0　→　偽　（and の左側が偽なので、右側は調べずに繰り返しを終了）`,{badge:'偽'});break;}
+        const r=desc?T.a[j]<T.t:T.a[j]>T.t;T.cnt.cmp++;
+        T.s(8,`j >= 0 and Hairetsu[{ウ:j}] ${op} hozon　→　${j} >= 0 and ${T.a[j]} ${op} ${T.t}　→　${TF(r)}`,{act:{type:'cmp',idx:[j,'t']},badge:TF(r)});
+        if(!r)break;
+        T.cnt.a++;
+        T.reg.stale=j;T.copy(9,j,j+1,`Hairetsu[{エ:j + 1}] = Hairetsu[{オ:j}]{?　→　Hairetsu[${j+1}] = Hairetsu[${j}]} = ${T.a[j]}　（1つ後ろへずらす。値はコピーなので一時的に同じ値が2つ並ぶ）`);
+        j--;T.v.j=j;T.p.j=j;T.s(10,`j = j - 1 = ${j}`);
+      }
+      T.reg={done:range(0,i),br:{lo:0,hi:i,label:'整列済み部分',k:'done'}};
+      T.copy(11,'t',j+1,`Hairetsu[{カ:j + 1}] = hozon{?　→　Hairetsu[${j+1}] = hozon} = ${T.t}　（空いた位置に挿入）`);
+    }
+    T.p={};T.reg={done:range(0,n-1)};
+    T.s(5,`i が {ア:n - 1}{? = ${n-1}} を超えたので、繰り返しを終了`,{badge:'終了'});
+    T.out.push(`[${T.a.join(', ')}]`);T.s(13,`表示する(Hairetsu)　→　[${T.a.join(', ')}]`,{end:true});
+    return T.steps;
+  },
+  points:[
+    '未整列部分の先頭を hozon に取り出し、整列済み部分の正しい位置に「挿入」する。トランプの手札を並べるときの動き。',
+    '挿入する場所をあけるため、条件を満たす値を1つずつ後ろ（右）へずらす。ずらしている途中は同じ値が2つ並ぶ。',
+    '8行目は j >= 0 を先に調べる。j が -1 になると and の右側（Hairetsu[-1]）は調べずに終わる。',
+    '繰り返しが終わったとき、j は「挿入位置の1つ前」を指している。だから最後は Hairetsu[j + 1] に入れる。',
+    {t:'「整列済み」の配列を入れると、処理Aは何回になる？ 「逆順」ではどう？',try:true},
+  ]
+},
+{
+  id:'bubble',group:'整列',tab:'バブルソート',title:'バブルソート',arrName:'Suretsu',tmpName:'koukan',
+  ptrs:[{n:'i',c:'--p-i',row:0},{n:'j',c:'--p-j',row:1},{n:'j + 1',c:'--p-j',row:1}],
+  vars:['n','i','j','koukan','f'],
+  counters:[['cmp','比較回数（処理B）'],['a','交換回数（処理A）']],
+  input:'arr',order:true,defaults:{arr:[7,1,4,2],order:'asc',variant:'basic'},
+  variants:[{id:'basic',label:'基本のプログラム（問題集(1)）'},{id:'flag',label:'改良版：f で途中終了（問題集(2)）'},{id:'noC',label:'改良版で命令C（f = 1）を書き忘れた'}],
+  presets:[{label:'問題集【3】の例',arr:[7,1,4,2]}],
+  legend:[['done','右端から確定'],['cmp','比較中'],['tmp','退避用 koukan']],
+  code(o){const op=o.order==='asc'?'>':'<';
+    const head=['# 設定','Suretsu = 【外部から数列を入力】','n = 要素数(Suretsu)　# 配列Suretsuの要素数（数列の長さ）を代入','# 処理',
+      'i を n - 2 から 0 まで 1 ずつ減らしながら繰り返す:'];
+    if(o.variant==='basic')return[...head,
+      '│j を 0 から i まで 1 ずつ増やしながら繰り返す:',
+      `││もし Suretsu[j] ${op} Suretsu[j + 1] ならば:`,
+      '│││koukan = Suretsu[j]','│││Suretsu[j] = Suretsu[j + 1]','⎿⎿⎿Suretsu[j + 1] = koukan',
+      '# 結果表示','表示する(Suretsu)'];
+    return[...head,'│f = 0',
+      '│j を 0 から i まで 1 ずつ増やしながら繰り返す:',
+      `││もし Suretsu[j] ${op} Suretsu[j + 1] ならば:`,
+      '│││koukan = Suretsu[j]','│││Suretsu[j] = Suretsu[j + 1]','│││Suretsu[j + 1] = koukan',
+      o.variant==='noC'?'│⎿⎿~f = 1　# 命令C':'│⎿⎿f = 1　# 命令C',
+      '│もし f == 0 ならば:','⎿⎿反復を抜ける',
+      '# 結果表示','表示する(Suretsu)'];},
+  trace(o){
+    const a=o.arr,n=a.length,asc=o.order==='asc',op=asc?'>':'<',v=o.variant;
+    const L=v==='basic'?{I:5,J:6,C:7,s1:8,s2:9,s3:10,out:12}:{I:5,f0:6,J:7,C:8,s1:9,s2:10,s3:11,f1:12,chk:13,brk:14,out:16};
+    const T=new Tracer(a,'koukan');T.s(0,'');
+    T.s(2,`Suretsu = [${a.join(', ')}]`);
+    T.v.n=n;T.s(3,`n = 要素数(Suretsu) = ${n}`);
+    let broke=false;
+    for(let i=n-2;i>=0;i--){
+      T.v.i=i;T.p.i=i;delete T.p.j;delete T.p['j + 1'];T.v.j=undefined;
+      T.reg={done:range(i+2,n-1),br:{lo:0,hi:i+1,label:'比べる範囲（0 〜 i + 1）'}};
+      T.s(L.I,`i = ${i}　（n - 2 = ${n-2} から 0 までの範囲なので繰り返す）`,{badge:`i = ${i}`});
+      if(v!=='basic'){T.v.f=0;T.s(L.f0,'f = 0　（この周で交換が起きたかどうかの目印をリセット）');}
+      for(let j=0;j<=i;j++){
+        T.v.j=j;T.p.j=j;T.p['j + 1']=j+1;
+        T.s(L.J,`j = ${j}　（0 〜 i = ${i}）`,{badge:`j = ${j}`});
+        const r=asc?T.a[j]>T.a[j+1]:T.a[j]<T.a[j+1];T.cnt.cmp++;
+        T.s(L.C,`Suretsu[${j}] ${op} Suretsu[${j+1}]　→　${T.a[j]} ${op} ${T.a[j+1]}　→　${TF(r)}`,{act:{type:'cmp',idx:[j,j+1]},badge:TF(r)});
+        if(r){
+          T.cnt.a++;
+          T.copy(L.s1,j,'t',`koukan = Suretsu[${j}] = ${T.a[j]}　（処理A ${T.cnt.a}回目）`);
+          T.copy(L.s2,j+1,j,`Suretsu[${j}] = Suretsu[${j+1}] = ${T.a[j+1]}`);
+          T.copy(L.s3,'t',j+1,`Suretsu[${j+1}] = koukan = ${T.t}`);
+          if(v==='flag'){T.v.f=1;T.s(L.f1,'f = 1　（命令C：この周で交換が起きた印）');}
+        }
+      }
+      delete T.p.j;delete T.p['j + 1'];
+      T.reg={done:range(i+1,n-1),br:null};
+      T.s(L.J,`j が i = ${i} を超えたので j の繰り返しを終了　→　添字 ${i+1} の値が確定`,{badge:'終了'});
+      if(v!=='basic'){
+        const r=T.v.f===0;
+        T.s(L.chk,`f == 0　→　${T.v.f} == 0　→　${TF(r)}`,{badge:TF(r)});
+        if(r){T.p={};T.reg={done:isSorted(T.a,asc)?range(0,n-1):[]};T.s(L.brk,'反復を抜ける　（i の繰り返しを途中で終了）',{badge:'脱出'});broke=true;break;}
+      }
+    }
+    if(!broke){T.p={};T.reg={done:range(0,n-1)};T.s(L.I,'i が 0 を下回ったので、繰り返しを終了',{badge:'終了'});}
+    const ok=isSorted(T.a,asc);
+    T.out.push(`[${T.a.join(', ')}]`+(ok?'':'\n!整列されていない！'));
+    T.s(L.out,`表示する(Suretsu)　→　[${T.a.join(', ')}]${ok?'':'　（正しく整列されていない！）'}`,{end:true});
+    return T.steps;
+  },
+  points:[
+    '隣どうし（j と j + 1）を比べ、順番が逆なら交換する。1周ごとに最大（降順なら最小）の値が右端へ浮かび上がり確定する。',
+    'i は「比べる最後のペアの左側の添字」。i が1つ減るごとに比べる範囲が1つ短くなる。',
+    '改良版は「1周の間に一度も交換がなければ、もう整列済み」と判断して反復を抜ける（f は交換が起きた目印）。',
+    {t:'「整列済み」「逆順」で、比較回数と交換回数はどう変わる？ 基本と改良版で比べよう。',try:true},
+    {t:'命令Cを書き忘れると、どんな配列のときに正しく整列されない？',try:true},
+  ]
+},
+{
+  id:'linear',group:'探索',tab:'線形探索',title:'線形探索',arrName:'Hairetsu',tmpName:null,
+  ptrs:[{n:'i',c:'--p-i',row:0}],
+  vars:['atai','n','i'],
+  counters:[['cmp','比較回数（7行目）']],
+  input:'arr',search:true,defaults:{arr:[42,8,25,63,3,78,19,57,12,31],atai:57},
+  presets:[{label:'10個の例',arr:[42,8,25,63,3,78,19,57,12,31]}],
+  legend:[['dim','調べ終わった'],['cmp','比較中'],['found','見つかった']],
+  code(){return[
+    '# 設定','Hairetsu = 【外部から配列を入力】','atai = 【外部から目的の値を入力】','n = 要素数(Hairetsu)　# 配列Hairetsuの要素数を代入','# 処理',
+    'i を 0 から n - 1 まで 1 ずつ増やしながら繰り返す:',
+    '│もし Hairetsu[i] == atai ならば:',
+    '││表示する(i)',
+    '⎿⎿プログラムを終了する',
+    '表示する("見つかりませんでした")'];},
+  trace(o){
+    const a=o.arr,n=a.length,x=o.atai;const T=new Tracer(a,null);T.s(0,'');
+    T.s(2,`Hairetsu = [${a.join(', ')}]`);
+    T.v.atai=x;T.s(3,`atai = ${x}`);
+    T.v.n=n;T.s(4,`n = 要素数(Hairetsu) = ${n}`);
+    for(let i=0;i<n;i++){
+      T.v.i=i;T.p.i=i;T.reg={dim:range(0,i-1)};
+      T.s(6,`i = ${i}　（0 〜 n - 1 = ${n-1}）`,{badge:`i = ${i}`});
+      const r=a[i]===x;T.cnt.cmp++;
+      T.s(7,`Hairetsu[${i}] == atai　→　${a[i]} == ${x}　→　${TF(r)}`,{act:{type:'cmp',idx:[i]},badge:TF(r)});
+      if(r){T.reg.found=i;T.out.push(String(i));T.s(8,`表示する(i)　→　${i}　（添字 ${i} で見つかった）`);T.s(9,'プログラムを終了する',{end:true,badge:'終了'});return T.steps;}
+    }
+    T.p={};T.reg={dim:range(0,n-1)};
+    T.s(6,`i が n - 1 = ${n-1} を超えたので、繰り返しを終了`,{badge:'終了'});
+    T.out.push('見つかりませんでした');T.s(10,'表示する("見つかりませんでした")',{end:true});
+    return T.steps;
+  },
+  points:[
+    '先頭から順に1つずつ目的の値と比べる。データが並んでいなくても使える。',
+    '見つかった時点で終了するので、比較回数は「目的の値の位置 + 1」回。最後まで見つからないと n 回。',
+    {t:'カードをクリックすると、その値を探す。一番右の値や、ない値（例：100）を探すと比較回数は？',try:true},
+  ]
+},
+{
+  id:'binary',group:'探索',tab:'二分探索',title:'二分探索',arrName:'Hairetsu',tmpName:null,pads:[1,1],
+  ptrs:[{n:'sentou',c:'--p-lo',row:0},{n:'chuou',c:'--p-c',row:1},{n:'matsubi',c:'--p-lo',row:2}],
+  vars:['atai','n','sentou','matsubi','chuou'],
+  counters:[['cmp','調べた回数（11行目）']],
+  input:'arr',search:true,sorted:true,blanks:true,defaults:{arr:[3,8,12,19,25,31,42,57,63,78],atai:63},
+  presets:[{label:'10個の例',arr:[3,8,12,19,25,31,42,57,63,78]},{label:'15個の例',arr:[2,5,9,14,20,23,31,36,44,50,58,61,70,77,85]}],
+  legend:[['range','探索範囲'],['dim','範囲の外'],['cmp','比較中'],['found','見つかった']],
+  code(){return[
+    '# 設定','Hairetsu = 【外部から配列を入力】','atai = 【外部からHairetsu内の目的の値を入力】','n = 要素数(Hairetsu)　# 配列Hairetsuの要素数を代入',
+    '# 初期化','sentou = 0','matsubi = n - 1','# 処理',
+    'sentou <= matsubi の間繰り返す:',
+    '│chuou = (sentou + matsubi) ÷ 2',
+    '│もし {ア:atai} == Hairetsu[chuou] ならば:',
+    '││# 結果表示',
+    '││表示する({イ:chuou})',
+    '││プログラムを終了する',
+    '│そうでなくもし {ア:atai} < Hairetsu[chuou] ならば:',
+    '││{ウ:matsubi} = {イ:chuou} - 1',
+    '│そうでなければ:',
+    '⎿⎿{エ:sentou} = {イ:chuou} + 1'];},
+  trace(o){
+    const a=o.arr,n=a.length,x=o.atai;const T=new Tracer(a,null);T.s(0,'');
+    const out=(lo,hi)=>range(0,n-1).filter(k=>k<lo||k>hi);
+    T.s(2,`Hairetsu = [${a.join(', ')}]`);
+    T.v.atai=x;T.s(3,`atai = ${x}`);
+    T.v.n=n;T.s(4,`n = 要素数(Hairetsu) = ${n}`);
+    let lo=0,hi=n-1;
+    T.v.sentou=0;T.p.sentou=0;T.s(6,'sentou = 0');
+    T.v.matsubi=hi;T.p.matsubi=hi;T.reg={br:{lo,hi,label:'探索範囲'}};T.s(7,`matsubi = n - 1 = ${hi}`);
+    while(true){
+      const c=lo<=hi;
+      T.reg={br:c?{lo,hi,label:'探索範囲'}:null,dim:out(lo,hi)};
+      if(!c){delete T.p.chuou;T.v.chuou=T.v.chuou;
+        T.s(9,`sentou <= matsubi　→　${lo} <= ${hi}　→　偽　（sentou と matsubi が入れかわった＝探索範囲がなくなった）`,{badge:'偽'});
+        T.out.push('（何も表示されない）');T.s(9,'目的の値は見つからず、繰り返しを終了',{end:true,badge:'終了'});return T.steps;}
+      T.s(9,`sentou <= matsubi　→　${lo} <= ${hi}　→　真`,{badge:'真'});
+      const m=Math.floor((lo+hi)/2);T.v.chuou=m;T.p.chuou=m;
+      T.s(10,`chuou = (sentou + matsubi) ÷ 2 = (${lo} + ${hi}) ÷ 2 = ${m}${(lo+hi)%2?'　（÷ は商。小数点以下は切り捨て）':''}`);
+      const eq=x===a[m];T.cnt.cmp++;
+      T.s(11,`{ア:atai} == Hairetsu[chuou]{?　→　atai == Hairetsu[${m}]}　→　${x} == ${a[m]}　→　${TF(eq)}`,{act:{type:'cmp',idx:[m]},badge:TF(eq)});
+      if(eq){T.reg.found=m;T.out.push(String(m));T.s(13,`表示する({イ:chuou}){?　→　表示する(chuou)}　→　${m}`);T.s(14,'プログラムを終了する',{end:true,badge:'終了'});return T.steps;}
+      const lt=x<a[m];
+      T.s(15,`{ア:atai} < Hairetsu[chuou]　→　${x} < ${a[m]}　→　${TF(lt)}`,{act:{type:'cmp',idx:[m]},badge:TF(lt)});
+      if(lt){hi=m-1;T.v.matsubi=hi;T.p.matsubi=hi;T.reg={br:lo<=hi?{lo,hi,label:'探索範囲'}:null,dim:out(lo,hi)};
+        T.s(16,`{ウ:matsubi} = {イ:chuou} - 1{?　→　matsubi = chuou - 1} = ${m} - 1 = ${hi}　（前半に絞る）`);}
+      else{T.s(17,`そうでなければ　（atai の方が大きい）`,{badge:'→'});
+        lo=m+1;T.v.sentou=lo;T.p.sentou=lo;T.reg={br:lo<=hi?{lo,hi,label:'探索範囲'}:null,dim:out(lo,hi)};
+        T.s(18,`{エ:sentou} = {イ:chuou} + 1{?　→　sentou = chuou + 1} = ${m} + 1 = ${lo}　（後半に絞る）`);}
+    }
+  },
+  points:[
+    '昇順（または降順）に並んでいることが前提。中央の値と比べ、探索範囲を半分ずつに絞る。',
+    'chuou = (sentou + matsubi) ÷ 2 の ÷ は「商」。割り切れないときは小数点以下を切り捨てる。',
+    '調べた chuou はもう範囲に入れないので、matsubi = chuou - 1、sentou = chuou + 1 と「±1」する。',
+    '見つからないときは sentou と matsubi が入れかわり（sentou > matsubi）、9行目の条件が偽になって終わる。',
+    {t:'10個の配列で、調べる回数が一番多くなるのはどの値？ 線形探索と比べよう。',try:true},
+  ]
+},
+];
+
+/* ---------------- 状態 ---------------- */
+const S={algo:null,opts:{},steps:[],k:0,playing:false,playId:0,anim:null,dur:450,delay:600};
+const OPTS={};ALGOS.forEach(A=>OPTS[A.id]=JSON.parse(JSON.stringify(A.defaults)));
+const SPEED=[[950,1300],[700,950],[450,600],[260,330],[110,140]];
+
+/* ---------------- タブ ---------------- */
+function buildTabs(){
+  const nav=$('#tabs');nav.innerHTML='';
+  const groups=[...new Set(ALGOS.map(a=>a.group))];
+  groups.forEach(g=>{
+    const d=document.createElement('div');d.className='tgroup';
+    d.innerHTML=`<span class="gl">${g}</span>`;
+    ALGOS.filter(a=>a.group===g).forEach(A=>{
+      const b=document.createElement('button');b.className='tab';b.id='tab-'+A.id;b.textContent=A.tab;b.setAttribute('role','tab');
+      b.onclick=()=>selectAlgo(A.id);d.appendChild(b);
+    });
+    nav.appendChild(d);
+  });
+}
+function selectAlgo(id){
+  stop();
+  S.algo=ALGOS.find(a=>a.id===id);S.opts=OPTS[id];
+  document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.id==='tab-'+id?'true':'false'));
+  try{localStorage.setItem('algoLabTab',id);}catch(e){}
+  buildOpts();rebuild();
+}
+
+/* ---------------- 設定パネル ---------------- */
+function parseArr(s){
+  const p=s.split(/[,\s、，]+/).filter(x=>x!=='');
+  if(p.length<2)return{err:'2個以上の整数をカンマ区切りで入力してください。'};
+  if(p.length>12)return{err:'要素は12個までにしてください。'};
+  const a=p.map(Number);
+  if(a.some(v=>!Number.isInteger(v)||v<0||v>999))return{err:'0〜999の整数を入力してください。'};
+  return{arr:a};
+}
+function randArr(n,sorted){
+  const pool=range(1,99);for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  const a=pool.slice(0,n);return sorted?a.sort((x,y)=>x-y):a;
+}
+function buildOpts(){
+  const A=S.algo,o=S.opts,box=$('#opts');let h='';
+  if(A.input==='xy'){
+    h+=`<div class="orow"><label class="l" for="inX">x の値</label><input type="number" id="inX" value="${o.xy[0]}"><label class="l" for="inY" style="min-width:auto">y の値</label><input type="number" id="inY" value="${o.xy[1]}"><button class="btn" id="bApply">反映</button></div>`;
+  }else{
+    h+=`<div class="orow"><label class="l" for="inArr">${A.arrName}</label><input type="text" id="inArr" value="${o.arr.join(', ')}" inputmode="numeric" autocomplete="off"><button class="btn" id="bApply">反映</button></div>`;
+    h+=`<div class="orow"><label class="l" for="selN">ランダム</label><select id="selN">${range(4,12).map(k=>`<option value="${k}"${k===(o.arr.length)?' selected':''}>${k}個</option>`).join('')}</select><button class="btn" id="bRand">ランダムに作る</button>`;
+    (A.presets||[]).forEach((p,i)=>h+=`<button class="btn" data-preset="${i}">${p.label}</button>`);
+    if(A.order)h+=`<button class="btn" id="bSorted">整列済み</button><button class="btn" id="bRev">逆順</button>`;
+    h+='</div>';
+    if(A.search)h+=`<div class="orow"><label class="l" for="inAtai">atai（目的の値）</label><input type="number" id="inAtai" value="${o.atai}"><button class="btn" id="bAtai">探す</button><span class="note">カードをクリックしても選べます</span></div>`;
+  }
+  if(A.order)h+=`<div class="orow"><span class="l">並べる順</span><span class="seg"><button id="oAsc" aria-pressed="${o.order==='asc'}">昇順（小さい順）</button><button id="oDesc" aria-pressed="${o.order==='desc'}">降順（大きい順）</button></span></div>`;
+  if(A.variants)h+=`<div class="orow"><label class="l" for="selV">プログラム</label><select id="selV">${A.variants.map(v=>`<option value="${v.id}"${v.id===o.variant?' selected':''}>${v.label}</option>`).join('')}</select></div>`;
+  if(A.blanks)h+=`<div class="orow"><span class="l">表示</span><label class="chk"><input type="checkbox" id="chkBlank"${o.blank?' checked':''}> 問題集と同じ空欄（ア・イ…）で表示</label></div>`;
+  if(A.sorted)h+='<div class="note">二分探索は昇順に並んでいることが前提なので、入力した配列は自動で昇順に並べ替えます。</div>';
+  h+='<div class="err" id="err"></div>';
+  box.innerHTML=h;
+  const err=m=>{$('#err').textContent=m||'';};
+  const applyArr=arr=>{if(A.sorted)arr=[...new Set(arr)].sort((x,y)=>x-y);o.arr=arr;$('#inArr').value=arr.join(', ');if(A.search&&!arr.includes(o.atai)&&o._pickNew)o.atai=arr[Math.floor(Math.random()*arr.length)];err('');rebuild();};
+  if(A.input==='xy'){
+    $('#bApply').onclick=()=>{const x=Number($('#inX').value),y=Number($('#inY').value);if(!Number.isInteger(x)||!Number.isInteger(y)||x<0||y<0||x>999||y>999){err('0〜999の整数を入力してください。');return;}o.xy=[x,y];err('');rebuild();};
+  }else{
+    $('#bApply').onclick=()=>{const r=parseArr($('#inArr').value);if(r.err){err(r.err);return;}applyArr(r.arr);};
+    $('#inArr').onkeydown=e=>{if(e.key==='Enter')$('#bApply').click();};
+    $('#bRand').onclick=()=>{const arr=randArr(Number($('#selN').value),A.sorted);if(A.search)o.atai=arr[Math.floor(Math.random()*arr.length)];applyArr(arr);if(A.search)$('#inAtai').value=o.atai;};
+    box.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{const p=A.presets[+b.dataset.preset];if(A.search&&!p.arr.includes(o.atai))o.atai=p.arr[p.arr.length-2];applyArr(p.arr.slice());if(A.search)$('#inAtai').value=o.atai;});
+    if(A.order){
+      $('#bSorted').onclick=()=>applyArr(o.arr.slice().sort((x,y)=>o.order==='asc'?x-y:y-x));
+      $('#bRev').onclick=()=>applyArr(o.arr.slice().sort((x,y)=>o.order==='asc'?y-x:x-y));
+    }
+    if(A.search){$('#bAtai').onclick=()=>{const v=Number($('#inAtai').value);if(!Number.isInteger(v)){err('整数を入力してください。');return;}o.atai=v;err('');rebuild();};
+      $('#inAtai').onkeydown=e=>{if(e.key==='Enter')$('#bAtai').click();};}
+  }
+  if(A.order){$('#oAsc').onclick=()=>{o.order='asc';buildOpts();rebuild();};$('#oDesc').onclick=()=>{o.order='desc';buildOpts();rebuild();};}
+  if(A.variants)$('#selV').onchange=e=>{o.variant=e.target.value;rebuild();};
+  if(A.blanks)$('#chkBlank').onchange=e=>{o.blank=e.target.checked;buildCode();render(S.k,false);fitBanner();};
+}
+function buildPoints(){
+  $('#points').innerHTML=S.algo.points.map(p=>typeof p==='string'?`<li>${esc(p)}</li>`:`<li class="try">${esc(p.t)}</li>`).join('');
+}
+
+/* ---------------- 舞台（配列のアニメーション） ---------------- */
+const stage=$('#stage');let G={},cards=[],tmpCard=null,ptrEls={},brEl=null;
+function layout(){
+  const A=S.algo,n=S.steps[0].arr.length,W=Math.max(280,stage.clientWidth);
+  const pads=A.pads||[0,0],slots=n+pads[0]+pads[1];
+  const slotW=Math.max(28,Math.min(A.maxSlot||92,Math.floor((W-8)/slots)));
+  const gap=Math.max(4,Math.round(slotW*.12));
+  const cardW=Math.min(slotW-gap,A.maxCard||80);
+  const cardH=Math.round(Math.min(80,Math.max(42,cardW*1.1)));
+  const ox=Math.round((W-slots*slotW)/2)+pads[0]*slotW;
+  const hasTmp=!!A.tmpName;
+  const tmpY=hasTmp?22:0;
+  const brY=hasTmp?tmpY+cardH+20:12;
+  const cardsY=brY+22;
+  const idxY=cardsY+cardH+5;
+  const rows=A.ptrs.length?Math.max(...A.ptrs.map(p=>p.row))+1:0;
+  const ptrY=idxY+(A.slotLabels?30:28);
+  const H=ptrY+rows*31+6;
+  G={W,n,slotW,cardW,cardH,ox,tmpY,brY,cardsY,idxY,ptrY,H,tmpX:Math.round(W/2-cardW/2)};
+}
+const cardX=i=>G.ox+i*G.slotW+(G.slotW-G.cardW)/2;
+const centerX=i=>G.ox+i*G.slotW+G.slotW/2;
+function mkCard(){const d=document.createElement('div');d.className='card';d.innerHTML='<div class="lvl"></div><span class="val"></span>';stage.appendChild(d);return d;}
+function sizeCard(el,x,y){Object.assign(el.style,{left:x+'px',top:y+'px',width:G.cardW+'px',height:G.cardH+'px',fontSize:Math.max(13,Math.min(28,G.cardW*.4))+'px'});}
+let VMAX=1;
+function setVal(el,v){
+  el.querySelector('.val').textContent=(v===null||v===undefined)?'':v;
+  el.querySelector('.lvl').style.height=(v===null||v===undefined)?'0%':Math.max(8,Math.round(v/VMAX*100))+'%';
+}
+function buildStage(){
+  const A=S.algo;stage.innerHTML='';cards=[];ptrEls={};tmpCard=null;
+  layout();stage.style.height=G.H+'px';
+  const st0=S.steps[0];
+  VMAX=Math.max(1,...(A.input==='xy'?S.opts.xy:st0.arr));
+  if(A.tmpName&&S.steps.some(s=>s.t!==null)){
+    const lb=document.createElement('div');lb.className='tmplabel';lb.textContent=A.tmpName;
+    Object.assign(lb.style,{left:(G.tmpX-60)+'px',top:'0px',width:(G.cardW+120)+'px'});stage.appendChild(lb);
+    tmpCard=mkCard();sizeCard(tmpCard,G.tmpX,G.tmpY);
+  }
+  brEl=document.createElement('div');brEl.className='br';brEl.innerHTML='<span></span>';brEl.style.top=G.brY+'px';stage.appendChild(brEl);
+  for(let i=0;i<G.n;i++){
+    const c=mkCard();sizeCard(c,cardX(i),G.cardsY);
+    if(A.search){c.classList.add('clickable');c.title='この値を探す';c.onclick=()=>{const v=S.steps[0].arr[i];S.opts.atai=v;const el=$('#inAtai');if(el)el.value=v;rebuild();};}
+    cards.push(c);
+    const ix=document.createElement('div');ix.className='idx'+(A.slotLabels?' named':'');
+    ix.textContent=A.slotLabels?A.slotLabels[i]:i;
+    Object.assign(ix.style,{left:(centerX(i)-30)+'px',width:'60px',top:G.idxY+'px'});stage.appendChild(ix);
+  }
+  if(!A.slotLabels&&G.n){
+    const nm=document.createElement('div');nm.className='idx';nm.textContent='添字';
+    Object.assign(nm.style,{left:(cardX(0)-46)+'px',width:'40px',top:G.idxY+'px',textAlign:'right'});
+    if(cardX(0)-46>=0)stage.appendChild(nm);
+  }
+  A.ptrs.forEach(p=>{
+    const e=document.createElement('div');e.className='ptr off';e.textContent=p.n;
+    e.style.background=`var(${p.c})`;e.style.borderBottomColor=`var(${p.c})`;e.style.top=(G.ptrY+p.row*31)+'px';
+    stage.appendChild(e);ptrEls[p.n]=e;
+  });
+}
+function paint(st,vals){
+  const vs=vals||st,r=st.reg||{},A=S.algo;
+  const cmpIdx=st.act&&st.act.type==='cmp'?st.act.idx:[];
+  cards.forEach((c,i)=>{
+    setVal(c,vs.arr[i]);
+    let cl='card'+(A.search?' clickable':'');
+    if(r.done&&r.done.includes(i))cl+=' done';
+    if(r.dim&&r.dim.includes(i))cl+=' dim';
+    if(r.found===i)cl+=' found';
+    if(r.stale===i)cl+=' stale';
+    if(cmpIdx.includes(i))cl+=' cmp';
+    c.className=cl;
+  });
+  if(tmpCard){setVal(tmpCard,vs.t);tmpCard.className='card tmp'+(vs.t===null?' empty':'')+(cmpIdx.includes('t')?' cmp':'');if(vs.t===null)tmpCard.querySelector('.val').textContent='—';}
+  if(r.br){
+    brEl.style.opacity='1';brEl.className='br'+(r.br.k==='done'?' k-done':'');
+    const x0=cardX(r.br.lo)-3,x1=cardX(r.br.hi)+G.cardW+3;brEl.style.left=x0+'px';brEl.style.width=(x1-x0)+'px';
+    brEl.querySelector('span').textContent=r.br.label;
+  }else brEl.style.opacity='0';
+  // ポインタ（同じ行で重なる j と j+1 は j+1 を少し右へ）
+  A.ptrs.forEach(p=>{
+    const e=ptrEls[p.n],idx=st.p[p.n];
+    if(idx===undefined){e.classList.add('off');return;}
+    e.classList.remove('off');e.style.left=centerX(idx)+'px';
+    e.textContent=p.n;
+  });
+}
+function posOf(loc){return loc==='t'?{x:G.tmpX,y:G.tmpY}:{x:cardX(loc),y:G.cardsY};}
+function fly(from,to,val,dur){
+  return new Promise(res=>{
+    const p0=posOf(from),p1=posOf(to);
+    const g=mkCard();g.classList.add('ghost');if(from==='t'||to==='t')g.classList.add('tmp');
+    setVal(g,val);sizeCard(g,0,0);
+    const lift=(from===to)?34:Math.min(70,26+Math.abs(p1.x-p0.x)*.22);
+    const cy=Math.min(p0.y,p1.y)-lift,cxm=(p0.x+p1.x)/2;
+    const kf=[];for(let s=0;s<=10;s++){const t=s/10,u=1-t;
+      kf.push({transform:`translate(${u*u*p0.x+2*u*t*cxm+t*t*p1.x}px,${u*u*p0.y+2*u*t*cy+t*t*p1.y}px)`});}
+    const an=g.animate(kf,{duration:dur,easing:'ease-in-out',fill:'forwards'});
+    const done=()=>{g.remove();if(S.anim&&S.anim.an===an)S.anim=null;res();};
+    S.anim={an,g};an.onfinish=done;an.oncancel=done;
+  });
+}
+function finishAnim(){if(S.anim){const a=S.anim;S.anim=null;a.an.cancel();}}
+function flash(loc){const el=loc==='t'?tmpCard:cards[loc];if(!el)return;el.classList.remove('land');void el.offsetWidth;el.classList.add('land');}
+
+/* ---------------- プログラム・変数・記録 ---------------- */
+let codeEls=[];
+function buildCode(){
+  const A=S.algo,o=S.opts,lines=A.code(o),blank=!!o.blank;
+  const box=$('#code');box.innerHTML='';codeEls=[];
+  lines.forEach((raw,i)=>{
+    const c=codeLine(raw,blank);const d=document.createElement('div');d.className='ln'+(c.strike?' strike':'');
+    d.innerHTML=`<span class="no">${i+1}</span><span class="gs">${c.guides}</span><span class="tx">${c.html}</span>${c.strike?'<span class="miss">← 書き忘れ（実行されない）</span>':''}`;
+    box.appendChild(d);codeEls.push(d);
+  });
+}
+function updCode(st,pv){
+  codeEls.forEach(e=>{e.classList.remove('cur','prev');const b=e.querySelector('.badge');if(b)b.remove();});
+  if(pv&&pv!==st&&pv.line&&codeEls[pv.line-1])codeEls[pv.line-1].classList.add('prev');
+  if(st.line&&codeEls[st.line-1]){
+    const e=codeEls[st.line-1];e.classList.remove('prev');e.classList.add('cur');
+    if(st.badge){const b=document.createElement('span');b.className='badge '+(st.badge==='真'?'t':st.badge==='偽'?'f':'n');b.textContent=st.badge;e.appendChild(b);}
+  }
+}
+function updVars(st,pv,anim){
+  const A=S.algo;
+  $('#vars').innerHTML=A.vars.map(k=>{
+    if(k==='f'&&!(S.opts.variant&&S.opts.variant!=='basic'))return'';
+    if(k==='koukan'&&A.id==='swap'&&S.opts.variant!=='ok')return'';
+    const v=st.v[k];const ch=anim&&pv&&pv!==st&&pv.v[k]!==v;
+    return`<div class="var${ch?' chg':''}"><span class="k">${k}</span><span class="v">${v===undefined||v===null?'—':v}</span></div>`;
+  }).join('');
+}
+function updLog(k){
+  const blank=!!S.opts.blank,from=Math.max(1,k-80);let h='';
+  for(let i=from;i<=k;i++){const s=S.steps[i];h+=`<li class="${i===k?'now':''}"><span class="l">${s.line}行目</span><span>${fmtLog(s.log,blank)}</span></li>`;}
+  const ol=$('#log');ol.innerHTML=h||'<li><span class="l"></span><span class="note">まだ実行していません</span></li>';ol.scrollTop=ol.scrollHeight;
+}
+// いまの処理の欄：そのアルゴリズムで一番長くなる説明に合わせて高さを固定し、途中で高さが変わらないようにする
+function fitBanner(){
+  const b=$('#banner');if(!b||!S.steps.length)return;
+  b.style.minHeight='';
+  const m=b.cloneNode(false);m.removeAttribute('id');
+  Object.assign(m.style,{position:'absolute',visibility:'hidden',left:'-9999px',top:'0',width:b.getBoundingClientRect().width+'px',minHeight:'0',height:'auto'});
+  document.body.appendChild(m);
+  let h=0;const blank=!!S.opts.blank;
+  m.innerHTML='<span class="note">「1行進む ▶」でプログラムを1行ずつ実行します。黄色の行が「今実行した行」です。</span>';h=m.offsetHeight;
+  for(let i=1;i<S.steps.length;i++){const st=S.steps[i];m.innerHTML=`<b>${st.line}行目</b>${fmtLog(st.log,blank)}`;if(m.offsetHeight>h)h=m.offsetHeight;}
+  m.remove();b.style.minHeight=h+'px';
+}
+function updBanner(st,k){
+  const b=$('#banner');
+  if(k===0){b.innerHTML='<span class="note">「1行進む ▶」でプログラムを1行ずつ実行します。黄色の行が「今実行した行」です。</span>';return;}
+  b.innerHTML=`<b>${st.line}行目</b>${fmtLog(st.log,!!S.opts.blank)}`;
+}
+function updCounters(st){
+  $('#counters').innerHTML=S.algo.counters.map(([k,l])=>`<div class="cnt"><span class="k">${l}</span><span class="v">${st.cnt[k]}</span></div>`).join('');
+}
+function updOut(st){
+  $('#out').innerHTML=st.out.length?st.out.map(l=>esc(l).replace(/^!(.*)$/m,'<span class="warn">$1</span>')).join('\n'):'<span class="note">（まだ表示されていません）</span>';
+}
+function updLegend(){
+  const m={done:['var(--ok)','var(--ok-soft)'],cmp:['var(--cmp)','var(--cmp-soft)'],tmp:['var(--hold)','var(--hold-soft)'],dim:['var(--line)','transparent'],found:['var(--ok)','var(--ok-soft)'],range:['var(--muted)','transparent']};
+  $('#legend').innerHTML=(S.algo.legend||[]).map(([k,l])=>`<span><i style="border-color:${m[k][0]};background:${m[k][1]};${k==='dim'?'opacity:.4':''}"></i>${l}</span>`).join('');
+}
+function updCtl(){
+  const k=S.k,N=S.steps.length-1;
+  $('#stepNo').textContent=`${k} / ${N}`;const sc=$('#scrub');sc.max=N;sc.value=k;
+  $('#bBack').disabled=k===0;$('#bReset').disabled=k===0;$('#bStep').disabled=k===N;$('#bEnd').disabled=k===N;
+  $('#bPlay').textContent=S.playing?'⏸ 一時停止':(k===N?'↺ もう一度':'▶ 自動再生');
+}
+
+/* ---------------- 再生 ---------------- */
+async function render(k,animate){
+  finishAnim();
+  const st=S.steps[k],pv=k>0?S.steps[k-1]:st;
+  updCode(st,pv);updVars(st,pv,animate);updLog(k);updBanner(st,k);updCounters(st);updOut(st);updCtl();
+  const act=st.act;
+  if(animate&&act&&act.type==='copy'&&!reduced){
+    paint(st,pv);
+    const src=act.from==='t'?tmpCard:cards[act.from];if(src)src.classList.add('src');
+    const val=act.from==='t'?pv.t:pv.arr[act.from];
+    await fly(act.from,act.to,val,S.dur);
+    if(S.k!==k)return;
+    paint(st);flash(act.to);
+  }else{
+    paint(st);
+    if(animate&&act&&(act.type==='copy'||act.type==='set'))flash(act.to);
+  }
+}
+function rebuild(){
+  stop();
+  const A=S.algo;
+  S.steps=A.trace(S.opts);S.k=0;
+  $('#stageTitle').textContent=A.arrName?`配列 ${A.arrName} のようす`:'変数のようす';
+  $('#stageTag').textContent=A.title;
+  buildCode();buildStage();updLegend();render(0,false);fitBanner();
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function play(){
+  if(S.k>=S.steps.length-1){S.k=0;render(0,false);await sleep(300);}
+  S.playing=true;const id=++S.playId;updCtl();
+  while(S.playing&&id===S.playId&&S.k<S.steps.length-1){
+    S.k++;await render(S.k,true);
+    if(!S.playing||id!==S.playId)break;
+    await sleep(S.delay);
+  }
+  if(id===S.playId){S.playing=false;updCtl();}
+}
+function stop(){S.playing=false;S.playId++;if(S.steps.length)updCtl();}
+function step(d){stop();const k=Math.max(0,Math.min(S.steps.length-1,S.k+d));if(k===S.k)return;S.k=k;render(k,d>0);}
+function setSpeed(v){const[d,w]=SPEED[v-1];S.dur=d;S.delay=w;}
+
+$('#bStep').onclick=()=>step(1);
+$('#bBack').onclick=()=>step(-1);
+$('#bReset').onclick=()=>{stop();S.k=0;render(0,false);};
+$('#bEnd').onclick=()=>{stop();S.k=S.steps.length-1;render(S.k,false);};
+$('#bPlay').onclick=()=>{if(S.playing)stop();else play();};
+$('#speed').oninput=e=>setSpeed(+e.target.value);
+$('#scrub').oninput=e=>{stop();S.k=+e.target.value;render(S.k,false);};
+document.addEventListener('keydown',e=>{
+  const t=e.target;if(t&&((t.tagName==='INPUT'&&!['checkbox','range'].includes(t.type))||t.tagName==='SELECT'||t.tagName==='TEXTAREA'))return;
+  if(t&&t.type==='range'&&(e.key==='ArrowRight'||e.key==='ArrowLeft'))return;
+  if(e.key==='ArrowRight'){e.preventDefault();step(1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();step(-1);}
+  else if(e.key===' '&&!(t&&t.tagName==='BUTTON')){e.preventDefault();S.playing?stop():play();}
+});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(!S.steps.length)return;finishAnim();buildStage();render(S.k,false);fitBanner();},120);});
+
+/* ---------------- 起動 ---------------- */
+setSpeed(3);buildTabs();
+let first='selection';
+const h=(location.hash||'').slice(1);
+if(ALGOS.some(a=>a.id===h))first=h;
+else{try{const s=localStorage.getItem('algoLabTab');if(s&&ALGOS.some(a=>a.id===s))first=s;}catch(e){}}
+selectAlgo(first);
+</script>
+
+</body>
+</html>
