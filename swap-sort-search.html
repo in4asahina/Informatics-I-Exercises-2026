@@ -58,6 +58,11 @@ nav.tabs{display:flex;flex-wrap:wrap;gap:10px 18px;margin-bottom:14px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);min-width:0}
 .ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line);font-weight:700;font-size:.9rem}
 .ph .tag{font-weight:400;color:var(--muted);font-size:.78rem}
+.fold{font:inherit;font-weight:700;color:var(--ink);background:none;border:none;padding:2px 6px 2px 0;margin:-2px 0;display:inline-flex;align-items:center;gap:8px;cursor:pointer;border-radius:6px}
+.fold:hover{color:var(--accent)}
+.fold .chev{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform .2s;margin:0 2px 3px 2px}
+.fold[aria-expanded="false"] .chev{transform:rotate(-45deg);margin-bottom:0}
+.panel.folded > .ph{border-bottom:none}
 .pb{padding:12px 14px}
 /* ---- stage ---- */
 .stagebox{padding:6px 10px 4px;overflow:hidden}
@@ -149,6 +154,20 @@ nav.tabs{display:flex;flex-wrap:wrap;gap:10px 18px;margin-bottom:14px}
 .out{font-family:var(--f-code);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-height:2.2em;white-space:pre-wrap;overflow-wrap:anywhere}
 .out .warn{color:var(--bad);font-family:var(--f-ui);font-weight:700}
 /* log */
+.fcbox{padding:10px 8px;text-align:center}
+#fc{max-width:100%;height:auto;display:inline-block}
+#fc text{font-family:var(--f-code);font-size:12.5px;fill:var(--ink)}
+#fc .fc-n{fill:var(--panel);stroke:var(--ink);stroke-width:1.5}
+#fc .fc-g.cur .fc-n{fill:var(--cur);stroke:var(--curline);stroke-width:3}
+#fc .fc-l{stroke:var(--muted);stroke-width:1.5;fill:none}
+#fc .fc-ah{fill:var(--muted)}
+#fc .fc-lab{font-family:var(--f-ui);font-size:11px;fill:var(--muted)}
+#fc .fc-g.miss .fc-n{stroke:var(--bad);stroke-dasharray:4 3}
+#fc .fc-g.miss text{fill:var(--bad)}
+#fc .fc-badge text{font-family:var(--f-ui);font-size:11.5px;font-weight:700}
+#fc .fc-badge.t rect{fill:var(--ok-soft)} #fc .fc-badge.t text{fill:var(--ok)}
+#fc .fc-badge.f rect{fill:var(--bad-soft)} #fc .fc-badge.f text{fill:var(--bad)}
+#fc .fc-badge.n rect{fill:var(--accent-soft)} #fc .fc-badge.n text{fill:var(--accent)}
 .log{max-height:240px;overflow:auto;margin:0;padding:6px 0;list-style:none;font-size:.86rem}
 .log li{display:flex;gap:10px;padding:2px 14px;overflow-wrap:anywhere}
 .log li .l{flex:0 0 3.2em;color:var(--muted);font-family:var(--f-code);font-size:.78rem;padding-top:.15em}
@@ -205,8 +224,12 @@ nav.tabs{display:flex;flex-wrap:wrap;gap:10px 18px;margin-bottom:14px}
 
     <div class="col">
       <section class="panel">
-        <div class="ph"><span>プログラム</span><span class="tag">共通テスト用プログラム表記</span></div>
+        <div class="ph"><button type="button" class="fold" id="foldCode" aria-expanded="true" aria-controls="code"><span class="chev" aria-hidden="true"></span>プログラム</button><span class="tag">共通テスト用プログラム表記</span></div>
         <div class="code" id="code"></div>
+      </section>
+      <section class="panel">
+        <div class="ph"><button type="button" class="fold" id="foldFc" aria-expanded="true" aria-controls="fcbox"><span class="chev" aria-hidden="true"></span>フローチャート</button><span class="tag">黄色＝今実行した処理（プログラムと同じ行）</span></div>
+        <div class="fcbox" id="fcbox"><svg id="fc" role="img" aria-label="フローチャート"></svg></div>
       </section>
       <section class="panel">
         <div class="ph"><span>変数</span><span class="tag">黄色く光る＝今の行で値が変わった</span></div>
@@ -585,6 +608,206 @@ const ALGOS=[
 },
 ];
 
+/* ---------------- フローチャート（プログラムの行と同期） ---------------- */
+// 部品：P=処理、T=端子（開始・終了）、L=繰り返し（初期化・条件の判断・更新）、IF=判断、BR=反復を抜ける
+const fP=(t,ln,o={})=>({k:'p',t,ln,...o});
+const fT=(t,ln)=>({k:'t',t,ln});
+const fL=(init,cond,upd,ln,body)=>({k:'loop',init,cond,upd,ln,body});
+const fIF=(c,ln,then,els,o={})=>({k:'if',c,ln,then,els,...o});
+const fBR=(t,ln)=>({k:'br',t,ln});
+const FLOWS={
+  swap(o){const[x,y]=o.xy;return o.variant==='ok'
+    ?[fT('開始',0),fP(`x = ${x}`,1),fP(`y = ${y}`,2),fP('koukan = x',3),fP('x = y',4),fP('y = koukan',5),fP('表示する(x, y)',6),fT('終了')]
+    :[fT('開始',0),fP(`x = ${x}`,1),fP(`y = ${y}`,2),fP('x = y',3),fP('y = x',4),fP('表示する(x, y)',5),fT('終了')];},
+  selection(o){const op=o.order==='asc'?'<':'>';return[fT('開始',0),fP('Hairetsu = 【入力】',2),fP('n = 要素数(Hairetsu)',3),
+    fL('i = 0','i <= n - 2','i = i + 1',5,[
+      fP('saisyou = i',6),
+      fL('j = i + 1','j <= n - 1','j = j + 1',7,[
+        fIF(`Hairetsu[{ア:j}] ${op} Hairetsu[{イ:saisyou}]`,8,[fP('{ウ:saisyou} = {エ:j}',9)])]),
+      fP('koukan = Hairetsu[i]',10),fP('Hairetsu[i] = Hairetsu[saisyou]',11),fP('Hairetsu[saisyou] = koukan',12)]),
+    fP('表示する(Hairetsu)',14),fT('終了')];},
+  insertion(o){const op=o.order==='desc'?'<':'>';return[fT('開始',0),fP('Hairetsu = 【入力】',2),fP('n = 要素数(Hairetsu)',3),
+    fL('i = 1','i <= {ア:n - 1}','i = i + 1',5,[
+      fP('hozon = Hairetsu[i]',6),fP('j = {イ:i - 1}',7),
+      fL(null,`j >= 0 and Hairetsu[{ウ:j}] ${op} hozon`,null,8,[
+        fP('Hairetsu[{エ:j + 1}] = Hairetsu[{オ:j}]',9),fP('j = j - 1',10)]),
+      fP('Hairetsu[{カ:j + 1}] = hozon',11)]),
+    fP('表示する(Hairetsu)',13),fT('終了')];},
+  bubble(o){const op=o.order==='asc'?'>':'<';const v=o.variant;
+    const head=[fT('開始',0),fP('Suretsu = 【入力】',2),fP('n = 要素数(Suretsu)',3)];
+    if(v==='basic')return[...head,
+      fL('i = n - 2','i >= 0','i = i - 1',5,[
+        fL('j = 0','j <= i','j = j + 1',6,[
+          fIF(`Suretsu[j] ${op} Suretsu[j + 1]`,7,[fP('koukan = Suretsu[j]',8),fP('Suretsu[j] = Suretsu[j + 1]',9),fP('Suretsu[j + 1] = koukan',10)])])]),
+      fP('表示する(Suretsu)',12),fT('終了')];
+    return[...head,
+      fL('i = n - 2','i >= 0','i = i - 1',5,[
+        fP('f = 0',6),
+        fL('j = 0','j <= i','j = j + 1',7,[
+          fIF(`Suretsu[j] ${op} Suretsu[j + 1]`,8,[fP('koukan = Suretsu[j]',9),fP('Suretsu[j] = Suretsu[j + 1]',10),fP('Suretsu[j + 1] = koukan',11),fP('f = 1',12,{miss:v==='noC'})])]),
+        fIF('f == 0',13,[fBR('反復を抜ける',14)])]),
+      fP('表示する(Suretsu)',16),fT('終了')];},
+  linear(){return[fT('開始',0),fP('Hairetsu = 【入力】',2),fP('atai = 【入力】',3),fP('n = 要素数(Hairetsu)',4),
+    fL('i = 0','i <= n - 1','i = i + 1',6,[
+      fIF('Hairetsu[i] == atai',7,[fP('表示する(i)',8),fT('終了',9)])]),
+    fP('表示する("見つかりませんでした")',10),fT('終了')];},
+  binary(){return[fT('開始',0),fP('Hairetsu = 【入力】',2),fP('atai = 【入力】',3),fP('n = 要素数(Hairetsu)',4),fP('sentou = 0',6),fP('matsubi = n - 1',7),
+    fL(null,'sentou <= matsubi',null,9,[
+      fP('chuou = (sentou + matsubi) ÷ 2',10),
+      fIF('{ア:atai} == Hairetsu[chuou]',11,[fP('表示する({イ:chuou})',13),fT('終了',14)],
+        [fIF('{ア:atai} < Hairetsu[chuou]',15,[fP('{ウ:matsubi} = {イ:chuou} - 1',16)],[fP('{エ:sentou} = {イ:chuou} + 1',18)],{ln2:17})])]),
+    fT('終了')];},
+};
+const FC={FS:12.5,NH:30,G:18,DH:46};
+const NS='http://www.w3.org/2000/svg';
+let fcNodes=[];
+function fcText(t,blank){return t.replace(/\{\?([^{}]*)\}/g,(m,a)=>blank?'':a).replace(/\{([ア-ン]):([^{}]+)\}/g,(m,l,a)=>blank?`［${l}］`:a);}
+let fcCtx=null;
+function fcW(t){ // 実際の表示フォントで文字幅を測る（測れないときは概算）
+  try{if(!fcCtx){fcCtx=document.createElement('canvas').getContext('2d');}
+    const ff=getComputedStyle(document.documentElement).getPropertyValue('--f-code')||'monospace';
+    fcCtx.font=`${FC.FS}px ${ff}`;const w=fcCtx.measureText(t).width;if(w>0)return w;}catch(e){}
+  let w=0;for(const ch of t)w+=(ch.charCodeAt(0)<0x2000?0.6:1)*FC.FS;return w;}
+function svgEl(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function linesOf(seq){const s=new Set();const walk=a=>a.forEach(n=>{if(n.ln!==undefined)s.add(n.ln);if(n.ln2)s.add(n.ln2);if(n.body)walk(n.body);if(n.then)walk(n.then);if(n.els)walk(n.els);});walk(seq);return s;}
+function fcLayout(seq,blank){
+  // 各ブロックは {h,l,r,exit,draw(cx,y,ctx)}：中心線から左右の幅 l・r、上端から下へ描く
+  const node=(n)=>{
+    const t=fcText(n.t,blank);
+    const w=Math.max(n.k==='t'?84:110,fcW(t+(n.miss?'（書き忘れ）':''))+30);
+    return{w,h:FC.NH,l:w/2,r:w/2,exit:!(n.k==='t'&&n.t!=='開始')&&n.k!=='br',draw(cx,y,ctx){
+      const g=svgEl('g',{class:'fc-g'+(n.miss?' miss':'')},ctx.svg);
+      svgEl('rect',{x:cx-w/2,y,width:w,height:FC.NH,rx:n.k==='t'?FC.NH/2:2,class:'fc-n'},g);
+      const tx=svgEl('text',{x:cx,y:y+FC.NH/2+1,'text-anchor':'middle','dominant-baseline':'central'},g);tx.textContent=t+(n.miss?'（書き忘れ）':'');
+      if(n.ln!==undefined)fcNodes.push({ln:n.ln,g,x:cx+w/2,y,kind:n.k,role:n.role,loop:n.loop});
+      if(n.k==='br'&&ctx.breaks.length)ctx.breaks[ctx.breaks.length-1].push({x:cx+w/2,y:y+FC.NH/2});
+    }};
+  };
+  const DH=FC.DH;
+  const block=(n)=>{
+    if(n.k==='p'||n.k==='t'||n.k==='br')return node(n);
+    if(n.k==='loop'){
+      // 繰り返しを「初期化 → 条件の判断 → 本体 → 更新 → 判断へ戻る」の形で描く
+      n._lines=linesOf(n.body);
+      const ini=n.init?node({k:'p',t:n.init,ln:n.ln,role:'init',loop:n}):null;
+      const upd=n.upd?node({k:'p',t:n.upd,ln:n.ln,role:'upd',loop:n}):null;
+      const c=fcText(n.cond,blank),dw=Math.max(126,fcW(c)*1.16+32),body=seqL(n.body);
+      const inL=Math.max(dw/2,body.l,ini?ini.l:0,upd?upd.l:0),inR=Math.max(dw/2,body.r,ini?ini.r:0,upd?upd.r:0);
+      const yD=ini?FC.NH+FC.G:0,yB=yD+DH+FC.G,yU=yB+body.h+FC.G,yE=upd?yU+FC.NH:yB+body.h,yBack=yE+12,h=yBack+16;
+      return{h,l:inL+20,r:inR+20,exit:true,draw(cx,y,ctx){
+        if(ini){ini.draw(cx,y,ctx);arrow(ctx,[[cx,y+FC.NH],[cx,y+yD]]);}
+        diamond(ctx,cx,y+yD,dw,c,{ln:n.ln,role:'cond',loop:n});
+        arrow(ctx,[[cx,y+yD+DH],[cx,y+yB]]);label(ctx,cx+6,y+yD+DH+9,'Yes');
+        ctx.breaks.push([]);
+        body.draw(cx,y+yB,ctx);
+        const br=ctx.breaks.pop();
+        if(upd){if(body.exit)arrow(ctx,[[cx,y+yB+body.h],[cx,y+yU]]);upd.draw(cx,y+yU,ctx);}
+        const xb=cx-inL-12,xr=cx+inR+12,yc=y+yD+DH/2;
+        if(upd||body.exit)arrow(ctx,[[cx,y+yE],[cx,y+yBack],[xb,y+yBack],[xb,yc],[cx-dw/2-1,yc]]);
+        arrow(ctx,[[cx+dw/2,yc],[xr,yc],[xr,y+h],[cx+2,y+h]]);label(ctx,cx+dw/2+4,yc-9,'No');
+        br.forEach(b=>arrow(ctx,[[b.x,b.y],[xr-1,b.y]]));
+      }};
+    }
+    if(n.k==='if'){
+      const c=fcText(n.c,blank),dw=Math.max(126,fcW(c)*1.16+32);
+      if(!n.els&&n.then.length===1&&n.then[0].k==='br'){
+        // 「もし ～ ならば 反復を抜ける」：Yes を右へ出し、繰り返しの出口へつなぐ
+        const b=node(n.then[0]);
+        return{h:DH,l:dw/2,r:dw/2+24+b.w,exit:true,draw(cx,y,ctx){
+          diamond(ctx,cx,y,dw,c,n);
+          const bx=cx+dw/2+24;
+          arrow(ctx,[[cx+dw/2,y+DH/2],[bx,y+DH/2]]);label(ctx,cx+dw/2+4,y+DH/2-9,'Yes');
+          b.draw(bx+b.w/2,y+DH/2-FC.NH/2,ctx);
+          label(ctx,cx+6,y+DH+9,'No');
+        }};
+      }
+      const th=seqL(n.then);
+      if(!n.els){
+        const bx=Math.max(dw/2,th.r)+16;
+        const h=DH+FC.G+th.h+14;
+        return{h,l:Math.max(dw/2,th.l),r:bx+4,exit:true,draw(cx,y,ctx){
+          diamond(ctx,cx,y,dw,c,n);
+          arrow(ctx,[[cx,y+DH],[cx,y+DH+FC.G]]);label(ctx,cx+6,y+DH+9,'Yes');
+          th.draw(cx,y+DH+FC.G,ctx);
+          const my=y+h;
+          if(th.exit)line(ctx,[[cx,y+DH+FC.G+th.h],[cx,my]]);
+          arrow(ctx,[[cx+dw/2,y+DH/2],[cx+bx,y+DH/2],[cx+bx,my],[cx+2,my]]);label(ctx,cx+dw/2+4,y+DH/2-9,'No');
+        }};
+      }
+      const el=seqL(n.els);
+      const off=Math.max(dw/2+10,th.r+18+el.l);
+      const h=DH+FC.G+Math.max(th.h,el.h)+14;
+      return{h,l:Math.max(dw/2,th.l),r:off+el.r,exit:th.exit||el.exit,draw(cx,y,ctx){
+        diamond(ctx,cx,y,dw,c,n);
+        arrow(ctx,[[cx,y+DH],[cx,y+DH+FC.G]]);label(ctx,cx+6,y+DH+9,'Yes');
+        th.draw(cx,y+DH+FC.G,ctx);
+        const xe=cx+off,my=y+h;
+        arrow(ctx,[[cx+dw/2,y+DH/2],[xe,y+DH/2],[xe,y+DH+FC.G]]);label(ctx,cx+dw/2+4,y+DH/2-9,'No');
+        el.draw(xe,y+DH+FC.G,ctx);
+        if(th.exit)line(ctx,[[cx,y+DH+FC.G+th.h],[cx,my]]);
+        if(el.exit)arrow(ctx,[[xe,y+DH+FC.G+el.h],[xe,my],[cx+2,my]]);
+      }};
+    }
+  };
+  const seqL=(s)=>{
+    const bs=s.map(block);let h=0;bs.forEach((b,i)=>h+=b.h+(i?FC.G:0));
+    return{h,l:Math.max(0,...bs.map(b=>b.l)),r:Math.max(0,...bs.map(b=>b.r)),exit:bs.length?bs[bs.length-1].exit:true,draw(cx,y,ctx){
+      let yy=y;bs.forEach((b,i)=>{if(i){if(bs[i-1].exit)arrow(ctx,[[cx,yy],[cx,yy+FC.G]]);yy+=FC.G;}b.draw(cx,yy,ctx);yy+=b.h;});
+    }};
+  };
+  function diamond(ctx,cx,y,dw,c,n){
+    const g=svgEl('g',{class:'fc-g'},ctx.svg);
+    svgEl('path',{d:`M${cx},${y} L${cx+dw/2},${y+DH/2} L${cx},${y+DH} L${cx-dw/2},${y+DH/2} Z`,class:'fc-n'},g);
+    const tx=svgEl('text',{x:cx,y:y+DH/2+1,'text-anchor':'middle','dominant-baseline':'central'},g);tx.textContent=c;
+    fcNodes.push({ln:n.ln,g,x:cx+dw/4,y,kind:'if',role:n.role,loop:n.loop});
+    if(n.ln2)fcNodes.push({ln:n.ln2,g,x:cx+dw/4,y,kind:'if'});
+  }
+  function pts(p){return p.map(q=>q.join(',')).join(' ');}
+  function line(ctx,p){svgEl('polyline',{points:pts(p),class:'fc-l'},ctx.svg);}
+  function arrow(ctx,p){svgEl('polyline',{points:pts(p),class:'fc-l','marker-end':'url(#fcah)'},ctx.svg);}
+  function label(ctx,x,y,t){const e=svgEl('text',{x,y,class:'fc-lab','dominant-baseline':'central'},ctx.svg);e.textContent=t;}
+  return seqL(seq);
+}
+function buildFlow(){
+  const svg=$('#fc');if(!svg)return;
+  while(svg.firstChild)svg.removeChild(svg.firstChild);fcNodes=[];
+  const f=FLOWS[S.algo.id];if(!f)return;
+  const lay=fcLayout(f(S.opts),!!S.opts.blank);
+  const M=10,W=Math.ceil(lay.l+lay.r+M*2),H=Math.ceil(lay.h+M*2);
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('width',W);svg.setAttribute('height',H);
+  const defs=svgEl('defs',{},svg);const mk=svgEl('marker',{id:'fcah',viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'},defs);
+  svgEl('path',{d:'M0,0 L10,5 L0,10 z',class:'fc-ah'},mk);
+  lay.draw(M+lay.l,M,{svg,breaks:[]});
+  // 今の処理を示すバッジ（真・偽など）を最前面に置くための層
+  svgEl('g',{id:'fcBadge'},svg);
+}
+function updFlow(st,k){
+  const svg=$('#fc');if(!svg)return;
+  fcNodes.forEach(n=>n.g.classList.remove('cur'));
+  const bl=$('#fcBadge');if(bl)while(bl.firstChild)bl.removeChild(bl.firstChild);
+  const ln=k===0?0:st.line;
+  let hits=fcNodes.filter(n=>n.ln===ln);
+  if(!hits.length)return;
+  // 繰り返しの行：最初に入るときは「初期化」、本体から戻ってきたときは「更新」を、条件の判断と一緒に光らせる
+  const lp=hits.find(n=>n.loop);
+  if(lp){
+    const prev=k>0?S.steps[k-1].line:0;
+    const back=lp.loop._lines&&lp.loop._lines.has(prev);
+    hits=hits.filter(n=>n.role==='cond'||(back?n.role==='upd':n.role==='init'));
+  }
+  hits.forEach(n=>n.g.classList.add('cur'));
+  const n=hits.find(h=>h.kind==='if')||hits[0];
+  if(st.badge&&k>0&&n.kind==='if'){
+    let t=st.badge;
+    if(n.role==='cond'){t=(t==='終了'||t==='偽')?'偽':'真';}
+    if(t==='→')return;
+    const w=fcW(t)+14,cls=t==='真'?'t':t==='偽'?'f':'n';
+    const g=svgEl('g',{class:'fc-badge '+cls},bl);
+    svgEl('rect',{x:n.x+6,y:n.y-12,width:w,height:20,rx:10},g);
+    const e=svgEl('text',{x:n.x+6+w/2,y:n.y-1,'text-anchor':'middle','dominant-baseline':'central'},g);e.textContent=t;
+  }
+}
+
 /* ---------------- 状態 ---------------- */
 const S={algo:null,opts:{},steps:[],k:0,playing:false,playId:0,anim:null,dur:450,delay:600};
 const OPTS={};ALGOS.forEach(A=>OPTS[A.id]=JSON.parse(JSON.stringify(A.defaults)));
@@ -781,6 +1004,7 @@ function buildCode(){
     d.innerHTML=`<span class="no">${i+1}</span><span class="gs">${c.guides}</span><span class="tx">${c.html}</span>${c.strike?'<span class="miss">← 書き忘れ（実行されない）</span>':''}`;
     box.appendChild(d);codeEls.push(d);
   });
+  buildFlow();
 }
 function updCode(st,pv){
   codeEls.forEach(e=>{e.classList.remove('cur','prev');const b=e.querySelector('.badge');if(b)b.remove();});
@@ -842,7 +1066,7 @@ function updCtl(){
 async function render(k,animate){
   finishAnim();
   const st=S.steps[k],pv=k>0?S.steps[k-1]:st;
-  updCode(st,pv);updVars(st,pv,animate);updLog(k);updBanner(st,k);updCounters(st);updOut(st);updCtl();
+  updCode(st,pv);updFlow(st,k);updVars(st,pv,animate);updLog(k);updBanner(st,k);updCounters(st);updOut(st);updCtl();
   const act=st.act;
   if(animate&&act&&act.type==='copy'&&!reduced){
     paint(st,pv);
@@ -879,6 +1103,14 @@ function stop(){S.playing=false;S.playId++;if(S.steps.length)updCtl();}
 function step(d){stop();const k=Math.max(0,Math.min(S.steps.length-1,S.k+d));if(k===S.k)return;S.k=k;render(k,d>0);}
 function setSpeed(v){const[d,w]=SPEED[v-1];S.dur=d;S.delay=w;}
 
+// 欄の折りたたみ（初期状態はどちらも開く）
+function setupFold(btnId,bodyId){
+  const btn=document.getElementById(btnId),body=document.getElementById(bodyId),panel=btn.closest('.panel');
+  btn.onclick=()=>{const open=btn.getAttribute('aria-expanded')!=='true';
+    btn.setAttribute('aria-expanded',open?'true':'false');body.hidden=!open;panel.classList.toggle('folded',!open);
+    if(open&&bodyId==='fcbox'&&S.steps.length)updFlow(S.steps[S.k],S.k);};
+}
+setupFold('foldCode','code');setupFold('foldFc','fcbox');
 $('#bStep').onclick=()=>step(1);
 $('#bBack').onclick=()=>step(-1);
 $('#bReset').onclick=()=>{stop();S.k=0;render(0,false);};
@@ -897,6 +1129,7 @@ let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>
 
 /* ---------------- 起動 ---------------- */
 setSpeed(3);buildTabs();
+try{document.fonts&&document.fonts.ready.then(()=>{if(S.steps.length){buildFlow();updFlow(S.steps[S.k],S.k);}});}catch(e){}
 let first='selection';
 const h=(location.hash||'').slice(1);
 if(ALGOS.some(a=>a.id===h))first=h;
