@@ -384,7 +384,7 @@ const ALGOS=[
   ]
 },
 {
-  id:'insertion',group:'整列',tab:'挿入ソート',title:'挿入ソート',arrName:'Hairetsu',tmpName:'hozon',pads:[1,0],
+  id:'insertion',group:'整列',tab:'挿入ソート',title:'挿入ソート',arrName:'Hairetsu',tmpName:'hozon',pads:[1,1],
   ptrs:[{n:'i',c:'--p-i',row:0},{n:'j',c:'--p-j',row:1}],
   vars:['n','i','hozon','j'],
   counters:[['cmp','比較回数（8行目の値の比較）'],['a','処理A（9・10行目）']],
@@ -439,7 +439,7 @@ const ALGOS=[
 },
 {
   id:'bubble',group:'整列',tab:'バブルソート',title:'バブルソート',arrName:'Suretsu',tmpName:'koukan',
-  ptrs:[{n:'i',c:'--p-i',row:0},{n:'j',c:'--p-j',row:1},{n:'j + 1',c:'--p-j',row:1}],
+  ptrs:[{n:'j',c:'--p-j',row:0},{n:'j + 1',c:'--p-j',row:0}],  // i はカードを指さず、比べる範囲の見出しで示す
   vars:['n','i','j','koukan','f'],
   counters:[['cmp','比較回数（処理B）'],['a','交換回数（処理A）']],
   input:'arr',order:true,defaults:{arr:[7,1,4,2],order:'asc',variant:'basic'},
@@ -470,7 +470,7 @@ const ALGOS=[
     let broke=false;
     for(let i=n-2;i>=0;i--){
       T.v.i=i;T.p.i=i;delete T.p.j;delete T.p['j + 1'];T.v.j=undefined;
-      T.reg={done:range(i+2,n-1),br:{lo:0,hi:i+1,label:'比べる範囲（0 〜 i + 1）'}};
+      T.reg={done:range(i+2,n-1),br:{lo:0,hi:i+1,label:'交換範囲'}};
       T.s(L.I,`i = ${i}　（n - 2 = ${n-2} から 0 までの範囲なので繰り返す）`,{badge:`i = ${i}`});
       if(v!=='basic'){T.v.f=0;T.s(L.f0,'f = 0　（この周で交換が起きたかどうかの目印をリセット）');}
       for(let j=0;j<=i;j++){
